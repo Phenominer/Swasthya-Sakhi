@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:swasth_sakhi/state/appstate.dart';
+import '../state/appstate.dart'; // <-- Import AppState
 
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
@@ -10,18 +10,55 @@ class AdminLoginScreen extends StatefulWidget {
 }
 
 class _AdminLoginScreenState extends State<AdminLoginScreen> {
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-
+  // Pre-fill controllers for easy hackathon demo
+  final TextEditingController emailController = TextEditingController(
+    text: "admin@admin.com",
+  );
+  final TextEditingController passwordController = TextEditingController(
+    text: "Akshat1234",
+  );
   bool obscure = true;
+
+  // This local loading state is useful for the button spinner
+  bool _isLoading = false;
+
+  /// Handles the login logic
+  void _handleLogin() async {
+    if (_isLoading) return;
+
+    // Use context.read inside a function, it doesn't listen for changes
+    final app = context.read<AppState>();
+
+    setState(() => _isLoading = true);
+
+    final success = await app.loginAsAdmin(
+      emailController.text.trim(),
+      passwordController.text.trim(),
+    );
+
+    // We check 'mounted' in case the widget is removed
+    if (context.mounted) {
+      setState(() => _isLoading = false);
+
+      if (success) {
+        // Pop back to the RootRouter, which will now show the AdminHome
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else {
+        // Show the error from AppState
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(app.loginError ?? "An unknown error occurred."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Watch AppState for loading and error messages
-    final app = context.watch<AppState>();
-
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A), // deep dark navy background
+      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -33,7 +70,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ... (Header text is the same)
               const SizedBox(height: 40),
               const Text(
                 "Admin Login",
@@ -71,34 +107,19 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                         : Icons.visibility_off_rounded,
                     color: Colors.white60,
                   ),
-                  onPressed: () {
-                    setState(() {
-                      obscure = !obscure;
-                    });
-                  },
+                  onPressed: () => setState(() => obscure = !obscure),
                 ),
               ),
-
               const SizedBox(height: 35),
 
-              // --- UPDATED LOGIN BUTTON ---
+              // Login Button
               InkWell(
-                // Disable button when loading
-                onTap: app.isLoading
-                    ? null
-                    : () {
-                        // All logic is moved to AppState!
-                        context.read<AppState>().loginAsAdmin(
-                          emailController.text.trim(),
-                          passwordController.text.trim(),
-                        );
-                      },
+                onTap: _handleLogin, // <-- CONNECTED
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 18),
                   decoration: BoxDecoration(
-                    // ... (styles are the same)
                     gradient: LinearGradient(
                       colors: [
                         const Color(0xFF1E3A8A).withOpacity(0.9),
@@ -117,13 +138,13 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                     ],
                   ),
                   child: Center(
-                    // Show a spinner or text
-                    child: app.isLoading
+                    child: _isLoading
                         ? const SizedBox(
-                            height: 22,
-                            width: 22,
+                            width: 24,
+                            height: 24,
                             child: CircularProgressIndicator(
                               color: Colors.white,
+                              strokeWidth: 3,
                             ),
                           )
                         : const Text(
@@ -138,23 +159,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                 ),
               ),
 
-              // --- ERROR MESSAGE ---
-              if (app.errorMessage != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 20.0),
-                  child: Center(
-                    child: Text(
-                      app.errorMessage!,
-                      style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ),
-
               const SizedBox(height: 18),
-              // ... (rest of the file is the same)
               Center(
                 child: Text(
                   "Forgot password?",
@@ -195,16 +200,13 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   }
 }
 
-// ... (_InputField and _SocialButton widgets are unchanged)
 // ---------------------- REUSABLE INPUT FIELD ----------------------
 class _InputField extends StatelessWidget {
-  // ... (no changes)
   final TextEditingController controller;
   final String label;
   final IconData icon;
   final Widget? suffix;
   final bool obscure;
-
   const _InputField({
     required this.controller,
     required this.label,
@@ -241,11 +243,9 @@ class _InputField extends StatelessWidget {
 
 // ---------------------- SOCIAL LOGIN BUTTON ----------------------
 class _SocialButton extends StatelessWidget {
-  // ... (no changes)
   final String text;
   final IconData icon;
   final VoidCallback onTap;
-
   const _SocialButton({
     required this.text,
     required this.icon,

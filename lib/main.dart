@@ -1,45 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-// Import Firebase
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; // You must generate this file with `flutterfire configure`
-
-// Import Services
-import '/services/auth_service.dart';
-import '/services/api_service.dart';
-
-// Import Screens (existing)
-import 'package:swasth_sakhi/screens/home_screen.dart';
 import 'package:swasth_sakhi/screens/admin_home.dart';
-import 'package:swasth_sakhi/screens/login_screen.dart';
-import 'package:swasth_sakhi/state/appstate.dart';
+import 'package:swasth_sakhi/screens/home_screen.dart';
+import 'package:swasth_sakhi/screens/login_screen.dart'; // Import the correct login screen
 
-void main() async {
-  // Ensure Flutter is ready
-  WidgetsFlutterBinding.ensureInitialized();
-  // Initialize Firebase
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+import 'state/appstate.dart';
 
+void main() {
   runApp(
-    // Use MultiProvider to provide services AND AppState
-    MultiProvider(
-      providers: [
-        // --- Provide the services ---
-        // These are simple Providers because they don't change state.
-        Provider<AuthService>(create: (_) => AuthService()),
-        Provider<ApiService>(create: (_) => ApiService()),
-
-        // --- Provide AppState ---
-        // AppState depends on the services.
-        // We use context.read to pass the services into AppState's constructor.
-        ChangeNotifierProvider<AppState>(
-          create: (context) =>
-              AppState(context.read<AuthService>(), context.read<ApiService>()),
-        ),
-      ],
-      child: const MyApp(),
-    ),
+    ChangeNotifierProvider(create: (_) => AppState(), child: const MyApp()),
   );
 }
 
@@ -72,19 +42,18 @@ class MyApp extends StatelessWidget {
 }
 
 /* ----------------------------------------------------
-   ROOT ROUTER: (No changes needed)
-   This will now work perfectly. When AppState.isLoggedIn
-   changes, this widget will rebuild and show the right screen.
+   ROOT ROUTER: decides which home screen to show
+   based on AppState role + login state
 -----------------------------------------------------*/
+
 class RootRouter extends StatelessWidget {
   const RootRouter({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Consumer is a bit cleaner here, but Provider.of works fine
     final app = Provider.of<AppState>(context);
 
-    // Show a loading spinner while logging in
+    // Show a loading spinner while logging in or out
     if (app.isLoading) {
       return const Scaffold(
         backgroundColor: Color(0xFF0F172A),
@@ -94,6 +63,7 @@ class RootRouter extends StatelessWidget {
 
     // Not logged in -> Login selection screen
     if (!app.isLoggedIn) {
+      // Use the LoginScreen with the two buttons
       return const LoginScreen();
     }
 
@@ -105,5 +75,3 @@ class RootRouter extends StatelessWidget {
     }
   }
 }
-
-// LoginTypeSelector is no longer needed, LoginScreen is the entry point

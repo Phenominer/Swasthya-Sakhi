@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:swasth_sakhi/state/appstate.dart';
+import '../state/appstate.dart'; // <-- Import AppState
 
 class WorkerLoginScreen extends StatefulWidget {
   const WorkerLoginScreen({super.key});
@@ -10,17 +10,49 @@ class WorkerLoginScreen extends StatefulWidget {
 }
 
 class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
-  final TextEditingController workerIdController = TextEditingController();
-  final TextEditingController phoneController = TextEditingController();
+  // Pre-fill for easy hackathon demo of Heena's account
+  final TextEditingController workerIdController = TextEditingController(
+    text: "heena@gmail.com",
+  );
+  final TextEditingController phoneController = TextEditingController(
+    text: "Heena1234",
+  );
 
-  // 'loading' is now controlled by AppState, so we remove it here.
-  // bool loading = false;
+  bool _isLoading = false; // Local loading state for button
+
+  /// Handles the login logic
+  void _handleLogin() async {
+    if (_isLoading) return;
+
+    final app = context.read<AppState>();
+
+    setState(() => _isLoading = true);
+
+    final success = await app.loginAsWorker(
+      workerIdController.text.trim(),
+      phoneController.text.trim(),
+    );
+
+    if (context.mounted) {
+      setState(() => _isLoading = false);
+
+      if (success) {
+        // Pop back to the RootRouter, which will now show the HomeScreen
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else {
+        // Show the error from AppState
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(app.loginError ?? "An unknown error occurred."),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Watch AppState for loading and error messages
-    final app = context.watch<AppState>();
-
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
@@ -34,7 +66,6 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ... (Header text is the same)
               const SizedBox(height: 40),
               const Text(
                 "Worker Login",
@@ -46,7 +77,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
               ),
               const SizedBox(height: 10),
               const Text(
-                "Login using your Worker ID or Phone Number.",
+                "Login using your credentials.",
                 style: TextStyle(color: Colors.white54, fontSize: 14),
               ),
               const SizedBox(height: 40),
@@ -54,7 +85,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
               // Worker ID
               _InputField(
                 controller: workerIdController,
-                label: "Worker ID",
+                label: "Worker ID or Email", // Updated label
                 icon: Icons.badge_rounded,
               ),
               const SizedBox(height: 20),
@@ -62,28 +93,20 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
               // Phone number
               _InputField(
                 controller: phoneController,
-                label: "Phone Number",
+                label: "Phone Number or Password", // Updated label
                 icon: Icons.phone_android_rounded,
+                obscure: true, // Hide password
               ),
               const SizedBox(height: 35),
 
-              // --- UPDATED CONTINUE BUTTON ---
+              // CONTINUE button
               InkWell(
-                onTap: app.isLoading
-                    ? null
-                    : () {
-                        // All logic is moved to AppState!
-                        context.read<AppState>().loginAsWorker(
-                          workerIdController.text.trim(),
-                          phoneController.text.trim(),
-                        );
-                      },
+                onTap: _handleLogin, // <-- CONNECTED
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 18),
                   decoration: BoxDecoration(
-                    // ... (styles are the same)
                     gradient: LinearGradient(
                       colors: [
                         const Color(0xFF1E3A8A).withOpacity(0.9),
@@ -102,13 +125,13 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                     ],
                   ),
                   child: Center(
-                    // Show a spinner or text
-                    child: app.isLoading
+                    child: _isLoading
                         ? const SizedBox(
-                            height: 22,
-                            width: 22,
+                            width: 24,
+                            height: 24,
                             child: CircularProgressIndicator(
                               color: Colors.white,
+                              strokeWidth: 3,
                             ),
                           )
                         : const Text(
@@ -123,23 +146,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                 ),
               ),
 
-              // --- ERROR MESSAGE ---
-              if (app.errorMessage != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 20.0),
-                  child: Center(
-                    child: Text(
-                      app.errorMessage!,
-                      style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ),
-
               const SizedBox(height: 30),
-              // ... (rest of the file is the same)
               Center(
                 child: Text(
                   "Or use worker login from your organization",
@@ -148,7 +155,12 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
               ),
               const SizedBox(height: 20),
               InkWell(
-                onTap: () {},
+                onTap: () {
+                  // Pre-fill for Sunita's demo
+                  workerIdController.text = "w1_sunita";
+                  phoneController.text = "9988776655";
+                  setState(() {});
+                },
                 borderRadius: BorderRadius.circular(14),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -170,7 +182,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                       const SizedBox(width: 16),
                       const Expanded(
                         child: Text(
-                          "Select Organization",
+                          "Demo: Login as Sunita",
                           style: TextStyle(color: Colors.white, fontSize: 15),
                         ),
                       ),
@@ -187,16 +199,13 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
   }
 }
 
-// ... (_InputField widget is unchanged)
 // ---------------------- REUSABLE INPUT FIELD ----------------------
 class _InputField extends StatelessWidget {
-  // ... (no changes)
   final TextEditingController controller;
   final String label;
   final IconData icon;
   final bool obscure;
   final Widget? suffix;
-
   const _InputField({
     required this.controller,
     required this.label,
