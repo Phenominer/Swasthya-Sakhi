@@ -1,26 +1,46 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:student/screens/auth/login_screen.dart';
-import 'package:student/screens/auth/register_screen.dart';
-import 'package:student/services/auth_service.dart';
-import 'package:student/utils/app_theme.dart';
+
+// Import Firebase
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart'; // You must generate this file with `flutterfire configure`
+
+// Import Services
+import '/services/auth_service.dart';
+import '/services/api_service.dart';
+
+// Import Screens (existing)
+import 'package:swasth_sakhi/screens/home_screen.dart';
+import 'package:swasth_sakhi/screens/admin_home.dart';
+import 'package:swasth_sakhi/screens/login_screen.dart';
+import 'package:swasth_sakhi/state/appstate.dart';
 
 void main() async {
+  // Ensure Flutter is ready
   WidgetsFlutterBinding.ensureInitialized();
-  
   // Initialize Firebase
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: 'YOUR_API_KEY',
-      appId: 'YOUR_APP_ID',
-      messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-      projectId: 'YOUR_PROJECT_ID',
-      // Add other required Firebase options
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  runApp(
+    // Use MultiProvider to provide services AND AppState
+    MultiProvider(
+      providers: [
+        // --- Provide the services ---
+        // These are simple Providers because they don't change state.
+        Provider<AuthService>(create: (_) => AuthService()),
+        Provider<ApiService>(create: (_) => ApiService()),
+
+        // --- Provide AppState ---
+        // AppState depends on the services.
+        // We use context.read to pass the services into AppState's constructor.
+        ChangeNotifierProvider<AppState>(
+          create: (context) =>
+              AppState(context.read<AuthService>(), context.read<ApiService>()),
+        ),
+      ],
+      child: const MyApp(),
     ),
   );
-  
-  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -28,172 +48,62 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        // Auth Service Provider
-        ChangeNotifierProvider(create: (_) => AuthService()),
-      ],
-      child: MaterialApp(
-        title: 'Student Attendance System',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
-        initialRoute: '/login',
-        routes: {
-          '/login': (context) => const LoginScreen(),
-          '/register': (context) => const RegisterScreen(),
-          // Add other routes here
-        },
-        home: const AuthWrapper(),
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Swasth Sakhi',
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color.fromARGB(255, 1, 16, 37),
+        primaryColor: const Color.fromARGB(255, 26, 64, 169),
+        colorScheme: const ColorScheme.dark(
+          primary: Color.fromARGB(255, 3, 75, 55),
+          secondary: Color.fromARGB(255, 246, 59, 59),
+          surface: Color(0xFF111827),
+        ),
+        textTheme: const TextTheme(
+          bodyMedium: TextStyle(color: Colors.white),
+          bodyLarge: TextStyle(color: Colors.white),
+          bodySmall: TextStyle(color: Colors.white),
+        ),
       ),
+      home: const RootRouter(),
     );
   }
 }
 
-class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({super.key});
+/* ----------------------------------------------------
+   ROOT ROUTER: (No changes needed)
+   This will now work perfectly. When AppState.isLoggedIn
+   changes, this widget will rebuild and show the right screen.
+-----------------------------------------------------*/
+class RootRouter extends StatelessWidget {
+  const RootRouter({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context);
-    
-    return StreamBuilder<User?>(
-      stream: authService.authStateChanges,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.active) {
-          final user = snapshot.data;
-          
-          if (user == null) {
-            return const LoginScreen();
-          }
-          
-          // User is signed in, show appropriate screen based on role
-          return FutureBuilder<UserModel?>(
-            future: authService.getCurrentUserData(),
-            builder: (context, userDataSnapshot) {
-              if (userDataSnapshot.connectionState == ConnectionState.done) {
-                final userData = userDataSnapshot.data;
-                
-                if (userData == null) {
-                  return const Scaffold(
-                    body: Center(
-                      child: Text('Error loading user data'),
-                    ),
-                  );
-                }
-                
-                // TODO: Return appropriate screen based on user role
-                switch (userData.role) {
-                  case 'admin':
-                    return const AdminHomeScreen();
-                  case 'faculty':
-                    return const FacultyHomeScreen();
-                  case 'student':
-                  default:
-                    return const StudentHomeScreen();
-                }
-              }
-              
-              // Show loading indicator while fetching user data
-              return const Scaffold(
-                body: Center(
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            },
-          );
-        }
-        
-        // Show loading indicator while checking auth state
-        return const Scaffold(
-          body: Center(
-            child: CircularProgressIndicator(),
-          ),
-        );
-      },
-    );
+    // Consumer is a bit cleaner here, but Provider.of works fine
+    final app = Provider.of<AppState>(context);
+
+    // Show a loading spinner while logging in
+    if (app.isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F172A),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Not logged in -> Login selection screen
+    if (!app.isLoggedIn) {
+      return const LoginScreen();
+    }
+
+    // Logged in -> send to worker or admin dashboard
+    if (app.role == "worker") {
+      return const HomeScreen();
+    } else {
+      return const AdminHomeScreen();
+    }
   }
 }
 
-// Placeholder screens - to be implemented
-class StudentHomeScreen extends StatelessWidget {
-  const StudentHomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Student Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _signOut(context),
-          ),
-        ],
-      ),
-      body: const Center(
-        child: Text('Welcome, Student!'),
-      ),
-    );
-  }
-  
-  void _signOut(BuildContext context) async {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    await authService.signOut();
-  }
-}
-
-class FacultyHomeScreen extends StatelessWidget {
-  const FacultyHomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Faculty Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _signOut(context),
-          ),
-        ],
-      ),
-      body: const Center(
-        child: Text('Welcome, Faculty!'),
-      ),
-    );
-  }
-  
-  void _signOut(BuildContext context) async {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    await authService.signOut();
-  }
-}
-
-class AdminHomeScreen extends StatelessWidget {
-  const AdminHomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin Dashboard'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _signOut(context),
-          ),
-        ],
-      ),
-      body: const Center(
-        child: Text('Welcome, Admin!'),
-      ),
-    );
-  }
-  
-  void _signOut(BuildContext context) async {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    await authService.signOut();
-  }
-}
+// LoginTypeSelector is no longer needed, LoginScreen is the entry point
